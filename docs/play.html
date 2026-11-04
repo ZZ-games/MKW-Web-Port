@@ -47,6 +47,12 @@
   .dl-btn-primary { background: var(--fg); color: #000; }
   .dl-btn-secondary { background: transparent; color: var(--fg); }
   .dl-btn small { display: block; font-size: 11px; opacity: .7; }
+  a.dl-btn { text-decoration: none; }
+  .dl-btn[hidden], #dl-unavailable[hidden] { display: none; }
+  #compat { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
+  #compat[hidden] { display: none; }
+  #compat h2 { margin: 0; font-size: 18px; }
+  #compat ul { margin: 0; padding: 0; list-style: none; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -59,10 +65,19 @@
     <button class="dl-btn dl-btn-primary" id="dl-skip-videos">Play without cutscenes<small>~817 MB — faster</small></button>
     <button class="dl-btn dl-btn-secondary" id="dl-all">Download everything<small>~2.5 GB — includes cutscenes</small></button>
   </div>
+  <p id="dl-unavailable" hidden>There's no game data download on this site. Import the files from your own extracted Mario Kart Wii disc instead.</p>
+  <a class="dl-btn dl-btn-primary" id="dl-import" href="import.html" hidden>Import my game files</a>
+  <a class="dl-btn dl-btn-secondary" id="dl-import-alt" href="import.html" hidden>Or import from your own disc files</a>
   <progress id="dl-progress" value="0" max="1" hidden></progress>
   <div id="dl-status" hidden>Preparing…</div>
   <div id="dl-error" hidden></div>
   <button id="dl-retry" hidden>Retry</button>
+</div>
+
+<div id="compat" hidden>
+  <h2>This browser can't run the game yet</h2>
+  <ul id="compat-list"></ul>
+  <a class="dl-btn dl-btn-secondary" href="play.html?ignore-checks=1">Try anyway</a>
 </div>
 
 <div class="stage" id="stage">
@@ -111,7 +126,24 @@
 
   // iPad / iPhone (iPadOS reports itself as a Mac, so check for a touch screen too).
   window.mkwIsIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // Sound: Safari starts every AudioContext suspended until a tap, and the game creates its own
+  // context outside a tap. Track every context and resume them on the next touch, click or key.
+  (function () {
+    const Native = window.AudioContext || window.webkitAudioContext;
+    if (!Native) return;
+    const contexts = new Set();
+    class TrackedAudioContext extends Native {
+      constructor(...args) { super(...args); contexts.add(this); }
+    }
+    window.AudioContext = TrackedAudioContext;
+    if (window.webkitAudioContext) window.webkitAudioContext = TrackedAudioContext;
+    const resumeAll = () => { for (const ctx of contexts) if (ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); };
+    for (const type of ['pointerdown', 'touchend', 'keydown', 'click']) document.addEventListener(type, resumeAll, true);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) resumeAll(); });
+  })();
 </script>
+<script src="touch-controls.js"></script>
 
 <script type="module">
   import { isGameDataReady, downloadGameData, TOTAL_BYTES } from './loader.js';
@@ -151,7 +183,25 @@
     });
   }
 
+  // Requirements the game binary can't run without; show a clear message instead of a crash.
+  function compatProblems() {
+    const ios = window.mkwIsIOS;
+    const problems = [];
+    if (!self.crossOriginIsolated) problems.push('Page is not cross-origin isolated yet — reload the page once.');
+    if (!('gpu' in navigator)) problems.push('WebGPU is missing — ' + (ios ? 'update to iPadOS 26 or newer.' : 'use an up-to-date Chrome, Edge or Safari.'));
+    if (typeof WebAssembly.Suspending !== 'function') problems.push('WebAssembly JSPI is missing — ' + (ios ? 'update to iPadOS 27 or newer.' : 'use an up-to-date Chrome, Edge or Safari.'));
+    return problems;
+  }
+
   async function run() {
+    const problems = new URLSearchParams(location.search).has('ignore-checks') ? [] : compatProblems();
+    if (problems.length) {
+      const list = document.getElementById('compat-list');
+      for (const text of problems) { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); }
+      document.getElementById('compat').hidden = false;
+      setStatus('', false);
+      return;
+    }
     const ready = await isGameDataReady();
     if (ready) {
       console.log('[loader] game data present in OPFS, launching');
@@ -168,10 +218,21 @@
     const choices = document.getElementById('dl-choices');
     overlay.hidden = false;
 
+    // Only offer the download if this site actually hosts the game data archives.
+    const hosted = await fetch('gamedata/game-data-core.tar', { method: 'HEAD' }).then((r) => r.ok, () => false);
+    if (!hosted) {
+      choices.hidden = true;
+      document.getElementById('dl-unavailable').hidden = false;
+      document.getElementById('dl-import').hidden = false;
+      return;
+    }
+    document.getElementById('dl-import-alt').hidden = false;
+
     let skipVideos = false;
 
     async function doDownload() {
       choices.hidden = true;
+      document.getElementById('dl-import-alt').hidden = true;
       progress.hidden = false;
       dlStatus.hidden = false;
       dlError.hidden = true;

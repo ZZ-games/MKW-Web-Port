@@ -1,0 +1,9 @@
+{
+ "size": 132243746,
+ "sha256": "482dd08025611c2b8484b11637d14cee58dd507946a4e986517b6f1d7c2c4245",
+ "parts": [
+  "WiiCompiled-safe.wasm.part0",
+  "WiiCompiled-safe.wasm.part1",
+  "WiiCompiled-safe.wasm.part2"
+ ]
+}
