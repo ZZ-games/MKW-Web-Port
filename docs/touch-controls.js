@@ -21,7 +21,13 @@
   const realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [];
   const realPads = () => { try { return Array.from(realGetGamepads() || []); } catch { return []; } };
   const hasRealPad = () => realPads().some((g) => g && g.connected);
-  let enabled = true;
+  // Saved choice for this device: 'on', 'off', or nothing (decide automatically).
+  // ?touch=1 / ?touch=0 in the URL still force it either way for one visit.
+  const PREF_KEY = 'mkwTouchControls';
+  const loadPref = () => { try { return localStorage.getItem(PREF_KEY); } catch { return null; } };
+  const savePref = (v) => { try { localStorage.setItem(PREF_KEY, v); } catch {} };
+  let pref = params.get('touch') === '1' ? 'on' : loadPref();
+  let enabled = pref !== 'off';
   navigator.getGamepads = function () {
     const real = realPads();
     if (!enabled || real.some((g) => g && g.connected)) return real;
@@ -53,6 +59,7 @@
              color: rgb(255 255 255 / 85%); font: 600 18px/1 system-ui, sans-serif; }
   #tc .btn.on { background: rgb(255 255 255 / 40%); }
   #tc .pill { border-radius: 14px; font-size: 14px; }
+  #tc-toggle.off { opacity: .3; }
   #tc-toggle { position: fixed; z-index: 51; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top));
                padding: 8px 12px; font: 13px system-ui, sans-serif; color: #e8e8e6; background: rgb(0 0 0 / 55%);
                border: 1px solid #2c2c29; border-radius: 6px; opacity: .45; touch-action: manipulation; }
@@ -86,15 +93,27 @@
   }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 
-  function setEnabled(on) {
+  function setEnabled(on, remember) {
     enabled = on;
     root.hidden = !on;
-    toggle.textContent = on ? 'Hide controls' : 'Show controls';
+    toggle.textContent = on ? 'Hide touch controls' : 'Touch controls';
+    toggle.classList.toggle('off', !on);
     if (!on) { buttons.forEach((b, i) => setButton(i, false)); pad.axes[0] = pad.axes[1] = 0; }
+    else announce();
+    if (remember) { pref = on ? 'on' : 'off'; savePref(pref); }
   }
 
   function wire() {
-    toggle.addEventListener('click', () => setEnabled(!enabled));
+    setEnabled(enabled, false);
+    toggle.addEventListener('click', () => setEnabled(!enabled, true));
+
+    // A hardware keyboard (e.g. a Magic Keyboard or Smart Keyboard on the iPad) hides the touch
+    // controls the first time a key is pressed, unless they were switched on by hand.
+    addEventListener('keydown', (e) => {
+      if (!enabled || pref === 'on' || e.isComposing || e.repeat) return;
+      if (e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+      setEnabled(false, true);
+    }, true);
 
     // Buttons: each pointer presses one button; sliding off releases it.
     root.querySelectorAll('.btn').forEach((el) => {
@@ -161,5 +180,5 @@
 
   // Let the game see the pad as soon as it starts polling.
   window.mkwTouchPad = pad;
-  setTimeout(announce, 4000);
+  setTimeout(() => { if (enabled) announce(); }, 4000);
 })();
