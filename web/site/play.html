@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKW Web</title>
+<style>
+  :root { color-scheme: light dark; --bg: #101010; --fg: #e8e8e6; --muted: #8d8d88; --line: #2c2c29; }
+  html { scrollbar-gutter: stable; }
+  body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; }
+  /* The game fills the whole window (kept at 16:9, black bars as needed); the status and log
+     sit below it, so scroll down to see them. */
+  .stage { position: relative; width: 100vw; height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; }
+  canvas { width: min(100vw, calc(100vh * 854 / 480)); height: min(100vh, calc(100vw * 480 / 854)); display: block; outline: none; }
+  #fullscreen { position: absolute; top: 8px; right: 8px; padding: 4px 10px; font: inherit; color: var(--fg); background: rgb(0 0 0 / 55%); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; opacity: .5; }
+  #fullscreen:hover { opacity: 1; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  #status { color: var(--muted); margin: 8px 0; font-variant-numeric: tabular-nums; }
+  pre { margin: 0; padding: 10px; border: 1px solid var(--line); height: 260px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="canvas" width="854" height="480" tabindex="0"></canvas>
+  <button id="fullscreen" type="button" title="Full screen (Esc to leave)">Full screen</button>
+</div>
+<main>
+  <div id="status">Loading…</div>
+  <pre id="log"></pre>
+</main>
+<script>
+  // Everything the game prints is shown here and forwarded to the local server's /log, so a
+  // boot attempt can be read back from web/logs/probe-game.log.
+  const logBox = document.getElementById('log');
+  const statusLine = document.getElementById('status');
+  const pending = [];
+  // The game can print thousands of lines; rewriting the panel per line starves the browser's
+  // main thread, which the game's threads also need for synchronous calls. Keep the last lines
+  // in memory and redraw at most four times a second.
+  const recent = [];
+  let redrawQueued = false;
+  const append = (text) => {
+    pending.push(text);
+    recent.push(text);
+    if (recent.length > 2000) recent.splice(0, recent.length - 1000);
+    if (!redrawQueued) {
+      redrawQueued = true;
+      setTimeout(() => {
+        redrawQueued = false;
+        logBox.textContent = recent.join('\n');
+        logBox.scrollTop = 1e9;
+      }, 250);
+    }
+  };
+  const flush = () => {
+    if (pending.length) fetch('/log?variant=game', { method: 'POST', body: pending.splice(0).join('\n') });
+  };
+  setInterval(flush, 1000);
+  window.addEventListener('error', (e) => { append('window.onerror: ' + e.message); flush(); });
+  window.addEventListener('unhandledrejection', (e) => {
+    append('unhandledrejection: ' + (e.reason && (e.reason.stack || e.reason))); flush();
+  });
+
+  if (!self.crossOriginIsolated) append('[page] NOT crossOriginIsolated: threads will not work');
+  append('[page] ' + navigator.userAgent);
+
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: (text) => append(text),
+    printErr: (text) => append(text),
+    setStatus: (text) => { if (text) statusLine.textContent = text; },
+    onAbort: (what) => { append('ABORT: ' + what); statusLine.textContent = 'Aborted.'; flush(); },
+    monitorRunDependencies: (left) => { statusLine.textContent = left ? `Loading (${left})…` : 'Running.'; },
+  };
+  const canvasEl = document.getElementById('canvas');
+  canvasEl.addEventListener('click', () => canvasEl.focus());
+  // Full screen covers the whole monitor; Esc leaves it. Focus goes back to the game for the keys.
+  document.getElementById('fullscreen').addEventListener('click', () => {
+    document.getElementById('stage').requestFullscreen().then(() => canvasEl.focus(), () => {});
+  });
+  canvasEl.addEventListener('dblclick', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.getElementById('stage').requestFullscreen().then(() => canvasEl.focus(), () => {});
+  });
+</script>
+<script>
+  // play.html?build=safe loads the SAFE_HEAP/assertions debug build instead.
+  const variant = new URLSearchParams(location.search).get('build') === 'safe' ? 'WiiCompiled-safe' : 'WiiCompiled';
+  // The game reads window.mkwDisplayHz to decide on frame interpolation (generated in-between
+  // frames on 120 Hz+ screens; gameplay stays 60 Hz). Measured from requestAnimationFrame before the
+  // game loads; play.html?interp=0 turns it off.
+  const measureDisplayHz = () => new Promise((resolve) => {
+    const stamps = [];
+    const tick = (t) => {
+      stamps.push(t);
+      if (stamps.length < 40) requestAnimationFrame(tick);
+      else {
+        const gaps = stamps.slice(1).map((v, i) => v - stamps[i]).sort((a, b) => a - b);
+        resolve(1000 / gaps[gaps.length >> 1]);
+      }
+    };
+    requestAnimationFrame(tick);
+    setTimeout(() => resolve(60), 2000); // hidden tab: rAF may not run
+  });
+  measureDisplayHz().then((hz) => {
+    const params = new URLSearchParams(location.search);
+    window.mkwDisplayHz = params.get('interp') === '0' ? 60 : Math.round(hz);
+    append('[page] display refresh ~' + window.mkwDisplayHz + ' Hz');
+    append('[page] loading /play/' + variant + '.js');
+    const script = document.createElement('script');
+    script.src = '/play/' + variant + '.js';
+    document.body.appendChild(script);
+  });
+</script>
+</body>
+</html>

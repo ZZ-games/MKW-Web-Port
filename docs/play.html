@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MKW">
+<meta name="theme-color" content="#000000">
+<title>MKW Web Port</title>
+<script src="coi-register.js"></script>
+<style>
+  :root { color-scheme: light dark; --fg: #e8e8e6; --muted: #8d8d88; --line: #2c2c29; }
+  html, body { height: 100%; }
+  /* Touch devices: no scrolling, rubber-banding, text selection, callouts or double-tap zoom. */
+  html { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; overflow: hidden; background: #000; color: var(--fg); font: 14px/1.45 system-ui, sans-serif;
+         touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  /* 100vh on iPad Safari includes the area behind the toolbar, so prefer dynamic viewport units. */
+  .stage { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; }
+  canvas { width: min(100vw, calc(100vh * 854 / 480)); height: min(100vh, calc(100vw * 480 / 854)); display: block; outline: none; touch-action: none; }
+  @supports (height: 100dvh) {
+    .stage { height: 100dvh; }
+    canvas { width: min(100vw, calc(100dvh * 854 / 480)); height: min(100dvh, calc(100vw * 480 / 854)); }
+  }
+  #fullscreen { position: absolute; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); padding: 8px 14px; font: inherit; color: var(--fg); background: rgb(0 0 0 / 55%); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; opacity: .35; }
+  #fullscreen:hover { opacity: 1; }
+  #fullscreen[hidden] { display: none; }
+  #status { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 4px 12px; color: var(--muted); background: rgb(0 0 0 / 60%); border-radius: 4px; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #status[hidden] { display: none; }
+
+  /* Download overlay */
+  #dl-overlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 12px; padding: 16px; }
+  #dl-overlay[hidden] { display: none; }
+  #dl-overlay h2 { margin: 0; font-size: 18px; color: var(--fg); }
+  #dl-overlay p { margin: 0; color: var(--muted); font-size: 13px; text-align: center; max-width: 400px; }
+  #dl-progress { width: min(400px, 80vw); height: 8px; accent-color: #6f9ef0; }
+  #dl-status { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  #dl-error { color: #f66; font-size: 13px; max-width: 400px; text-align: center; }
+  #dl-error[hidden] { display: none; }
+  #dl-retry { font: inherit; padding: 6px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--fg); color: #000; cursor: pointer; }
+  #dl-retry[hidden] { display: none; }
+  #dl-choices { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #dl-choices[hidden] { display: none; }
+  .dl-btn { font: inherit; padding: 8px 20px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; text-align: center; }
+  .dl-btn-primary { background: var(--fg); color: #000; }
+  .dl-btn-secondary { background: transparent; color: var(--fg); }
+  .dl-btn small { display: block; font-size: 11px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<!-- Download overlay (shown on first visit while game data is fetched) -->
+<div id="dl-overlay" hidden>
+  <h2>MKW Web Port</h2>
+  <p>First-time setup — download game data to play in your browser. Files are stored locally so you only download once.</p>
+  <div id="dl-choices">
+    <button class="dl-btn dl-btn-primary" id="dl-skip-videos">Play without cutscenes<small>~817 MB — faster</small></button>
+    <button class="dl-btn dl-btn-secondary" id="dl-all">Download everything<small>~2.5 GB — includes cutscenes</small></button>
+  </div>
+  <progress id="dl-progress" value="0" max="1" hidden></progress>
+  <div id="dl-status" hidden>Preparing…</div>
+  <div id="dl-error" hidden></div>
+  <button id="dl-retry" hidden>Retry</button>
+</div>
+
+<div class="stage" id="stage">
+  <canvas id="canvas" width="854" height="480" tabindex="0"></canvas>
+  <button id="fullscreen" type="button" title="Full screen (Esc to leave)">Full screen</button>
+  <div id="status">Loading&hellip;</div>
+</div>
+
+<script>
+  const statusLine = document.getElementById('status');
+  const setStatus = (text, visible) => { statusLine.textContent = text; statusLine.hidden = !visible; };
+
+  if (!self.crossOriginIsolated) console.warn('NOT crossOriginIsolated: threads will not work');
+
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: (text) => console.log(text),
+    printErr: (text) => console.warn(text),
+    setStatus: (text) => { if (text) setStatus(text, true); },
+    onAbort: (what) => { console.error('ABORT:', what); setStatus('The game stopped. Reload the page to restart.', true); },
+    monitorRunDependencies: (left) => { if (left) setStatus('Loading (' + left + ')…', true); else setStatus('', false); },
+  };
+  const canvasEl = document.getElementById('canvas');
+  const stageEl = document.getElementById('stage');
+  const fsButton = document.getElementById('fullscreen');
+  canvasEl.addEventListener('click', () => canvasEl.focus());
+
+  // Full screen with the WebKit-prefixed fallback. iPhone Safari has no element full screen at all,
+  // and a page added to the Home Screen is already full screen, so hide the button in those cases.
+  const fsRequest = stageEl.requestFullscreen || stageEl.webkitRequestFullscreen;
+  const fsActive = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsExit = () => (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  if (!fsRequest || standalone) fsButton.hidden = true;
+  const toggleFullscreen = () => {
+    if (!fsRequest) return;
+    if (fsActive()) { fsExit(); return; }
+    Promise.resolve(fsRequest.call(stageEl)).then(() => canvasEl.focus(), () => {});
+  };
+  fsButton.addEventListener('click', toggleFullscreen);
+  canvasEl.addEventListener('dblclick', toggleFullscreen);
+
+  // Keep Safari from panning, pinch-zooming or text-selecting while playing.
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || e.target === canvasEl) e.preventDefault(); }, { passive: false });
+
+  // iPad / iPhone (iPadOS reports itself as a Mac, so check for a touch screen too).
+  window.mkwIsIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+</script>
+
+<script type="module">
+  import { isGameDataReady, downloadGameData, TOTAL_BYTES } from './loader.js';
+
+  const mib = (n) => (n / 1048576).toFixed(0);
+
+  function launchGame() {
+    const variant = new URLSearchParams(location.search).get('build') === 'safe' ? 'WiiCompiled-safe' : 'WiiCompiled';
+    const measureDisplayHz = () => new Promise((resolve) => {
+      const stamps = [];
+      const tick = (t) => {
+        stamps.push(t);
+        if (stamps.length < 40) requestAnimationFrame(tick);
+        else {
+          const gaps = stamps.slice(1).map((v, i) => v - stamps[i]).sort((a, b) => a - b);
+          resolve(1000 / gaps[gaps.length >> 1]);
+        }
+      };
+      requestAnimationFrame(tick);
+      setTimeout(() => resolve(60), 2000);
+    });
+    measureDisplayHz().then((hz) => {
+      const params = new URLSearchParams(location.search);
+      // The game runs at 60 fps and interpolates up to the display rate. On a 120 Hz iPad Pro that
+      // doubles the presented frames, which is the expensive part, so cap iOS/iPadOS at 60 unless
+      // asked otherwise (?hz=120 forces a rate, ?interp=0 forces 60 everywhere).
+      let displayHz = Math.round(hz);
+      if (window.mkwIsIOS) displayHz = Math.min(displayHz, 60);
+      const forcedHz = parseInt(params.get('hz'), 10);
+      if (forcedHz >= 30 && forcedHz <= 240) displayHz = forcedHz;
+      window.mkwDisplayHz = params.get('interp') === '0' ? 60 : displayHz;
+      console.log('[page] display refresh ~' + window.mkwDisplayHz + ' Hz');
+      console.log('[page] loading play/' + variant + '.js');
+      const script = document.createElement('script');
+      script.src = 'play/' + variant + '.js';
+      document.body.appendChild(script);
+    });
+  }
+
+  async function run() {
+    const ready = await isGameDataReady();
+    if (ready) {
+      console.log('[loader] game data present in OPFS, launching');
+      launchGame();
+      return;
+    }
+
+    // Show download overlay
+    const overlay = document.getElementById('dl-overlay');
+    const progress = document.getElementById('dl-progress');
+    const dlStatus = document.getElementById('dl-status');
+    const dlError = document.getElementById('dl-error');
+    const retryBtn = document.getElementById('dl-retry');
+    const choices = document.getElementById('dl-choices');
+    overlay.hidden = false;
+
+    let skipVideos = false;
+
+    async function doDownload() {
+      choices.hidden = true;
+      progress.hidden = false;
+      dlStatus.hidden = false;
+      dlError.hidden = true;
+      retryBtn.hidden = true;
+      progress.value = 0;
+      dlStatus.textContent = 'Starting download…';
+
+      try {
+        await downloadGameData((loaded, total, archiveName) => {
+          progress.value = loaded / total;
+          dlStatus.textContent = mib(loaded) + ' / ' + mib(total) + ' MB' +
+            (archiveName ? ' — ' + archiveName : '');
+        }, { skipVideos, onStatus: (msg) => { if (msg) dlStatus.textContent = msg; } });
+
+        dlStatus.textContent = 'Download complete! Launching game…';
+        await new Promise((r) => setTimeout(r, 500));
+        overlay.hidden = true;
+        launchGame();
+      } catch (err) {
+        console.error('[loader] download failed:', err);
+        dlError.textContent = 'Download failed: ' + (err.message || err) + '. Check your connection and try again.';
+        dlError.hidden = false;
+        retryBtn.hidden = false;
+        dlStatus.textContent = 'Stopped.';
+      }
+    }
+
+    document.getElementById('dl-skip-videos').addEventListener('click', () => { skipVideos = true; doDownload(); });
+    document.getElementById('dl-all').addEventListener('click', () => { skipVideos = false; doDownload(); });
+    retryBtn.addEventListener('click', doDownload);
+  }
+
+  run();
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# Toolchains and SDKs
+emsdk/
+vcredist/
+
+# Native build workspace (huge)
+native/
+Wiicompiled/
+
+# Game ROM files (user must supply their own)
+game/
+
+# Browser profile
+web/brave-profile/
+
+# Build intermediates (keep only the final .js/.wasm output)
+web/build-game/CMake*
+web/build-game/CTest*
+web/build-game/CPack*
+web/build-game/_deps/
+web/build-game/aurora-build/
+web/build-game/wii_bootstrap/
+web/build-game/build.ninja
+web/build-game/cmake_install.cmake
+web/build-game/*.log
+web/build-game/*.a
+web/build-game/*.txt
+web/build-game/*.bat
+web/build-game/*.cmd
+web/build-game/*.cpp
+web/build-game/Tracy*
+web/build-game/.ninja_deps
+web/build-game/.ninja_log
+
+# Logs
+web/logs/
+logs-*.txt
+
+# OS junk
+desktop.ini
+Thumbs.db
+.DS_Store

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKW Game Import</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --line: #d9d9d4; --accent: #2f6fdb; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --line: #33332f; --accent: #6f9ef0; } }
+  body { margin: 0; padding: 32px 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  button { font: inherit; padding: 8px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--fg); color: var(--bg); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  progress { width: 100%; height: 10px; margin: 16px 0 4px; accent-color: var(--accent); }
+  #status { font-variant-numeric: tabular-nums; }
+  pre { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; max-height: 260px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Copy the game into this browser</h1>
+  <p>One-time step. Copies your extracted disc from the local server into this browser profile's
+     private storage (OPFS) and writes the game's Config.toml. Already-copied files are skipped,
+     so it can be re-run safely.</p>
+  <button id="go">Start import</button>
+  <progress id="bar" value="0" max="1"></progress>
+  <div id="status">Idle.</div>
+  <pre id="log"></pre>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const log = (line) => { $('log').textContent += line + '\n'; $('log').scrollTop = 1e9; };
+const report = (text) => fetch('/log?variant=import', { method: 'POST', body: text });
+const mib = (n) => (n / 1048576).toFixed(1) + ' MiB';
+
+// Same layout the game expects: XDG_DATA_HOME=/opfs, so user data is <OPFS>/WiiCompiled.
+const CONFIG_TOML = `[paths]
+dvd_root = "/opfs/WiiCompiled/dvd"
+
+[video]
+window_width = 854
+window_height = 480
+
+# The web build has no online play; network calls fail at once, like a Wii with no connection.
+[network]
+enabled = false
+`;
+
+async function dirFor(root, parts) {
+  let dir = root;
+  for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true });
+  return dir;
+}
+
+async function existingSize(dir, name) {
+  try { return (await (await dir.getFileHandle(name)).getFile()).size; } catch { return -1; }
+}
+
+async function writeText(dir, name, text) {
+  const writable = await (await dir.getFileHandle(name, { create: true })).createWritable();
+  await writable.write(text);
+  await writable.close();
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  const started = performance.now();
+  try {
+    const persisted = navigator.storage.persist ? await navigator.storage.persist() : false;
+    const estimate = await navigator.storage.estimate();
+    log(`storage: persisted=${persisted}, quota ${mib(estimate.quota)}, used ${mib(estimate.usage)}`);
+
+    const { files } = await (await fetch('/game-manifest.json')).json();
+    const total = files.reduce((sum, f) => sum + f.size, 0);
+    log(`${files.length} files, ${mib(total)} to check`);
+
+    const root = await navigator.storage.getDirectory();
+    const userData = await dirFor(root, ['WiiCompiled']);
+    await writeText(userData, 'Config.toml', CONFIG_TOML);
+    log('wrote WiiCompiled/Config.toml');
+
+    let done = 0, copied = 0, skipped = 0;
+    for (const file of files) {
+      const parts = file.path.split('/');
+      const name = parts.pop();
+      const dir = await dirFor(userData, ['dvd', ...parts]);
+      if (await existingSize(dir, name) === file.size) {
+        skipped++;
+      } else {
+        const response = await fetch('/game/' + file.path.split('/').map(encodeURIComponent).join('/'));
+        if (!response.ok) throw new Error(`HTTP ${response.status} for ${file.path}`);
+        const writable = await (await dir.getFileHandle(name, { create: true })).createWritable();
+        await response.body.pipeTo(writable);
+        copied++;
+      }
+      done += file.size;
+      $('bar').value = done / total;
+      $('status').textContent = `${mib(done)} / ${mib(total)} — ${copied} copied, ${skipped} already present`;
+    }
+    const seconds = ((performance.now() - started) / 1000).toFixed(1);
+    const summary = `import finished in ${seconds} s: ${copied} copied, ${skipped} skipped, ${mib(total)}`;
+    log(summary);
+    $('status').textContent = 'Done. Open /play.html to start the game.';
+    report(summary);
+  } catch (error) {
+    log('ERROR: ' + (error.stack || error));
+    $('status').textContent = 'Import failed; see the log below.';
+    report('ERROR: ' + (error.stack || error));
+  } finally {
+    $('go').disabled = false;
+  }
+};
+// import.html?auto starts without a click (used when the import is launched from a script).
+if (new URLSearchParams(location.search).has('auto')) $('go').click();
+</script>
+</body>
+</html>

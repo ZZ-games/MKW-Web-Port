@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKW Web</title>
+<script src="coi-register.js"></script>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --line: #d9d9d4; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --line: #33332f; } }
+  body { margin: 0; padding: 32px 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 20px; }
+  ul { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+  li { border-bottom: 1px solid var(--line); padding: 12px 0; }
+  a { color: inherit; }
+  code { font-size: 13px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+  .ok  { background: #1a7f37; color: #fff; }
+  .no  { background: #c33; color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>MKW Web Port</h1>
+  <p>Isolation: <code id="iso">checking…</code></p>
+  <ul>
+    <li><a href="play.html">Play</a> — launches Mario Kart Wii in the browser (auto-downloads game data on first visit)</li>
+  </ul>
+</main>
+<script>
+  const iso = self.crossOriginIsolated;
+  const sab = typeof SharedArrayBuffer !== 'undefined';
+  const el = document.getElementById('iso');
+  el.innerHTML = (iso ? 'crossOriginIsolated' : 'NOT isolated') +
+    '<span class="badge ' + (iso ? 'ok' : 'no') + '">' + (iso ? 'OK' : 'waiting for SW') + '</span>' +
+    (sab ? ', SharedArrayBuffer available' : ', no SharedArrayBuffer');
+</script>
+</body>
+</html>

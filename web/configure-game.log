@@ -1,0 +1,202 @@
+emcmake: D:/mkw-web/Wiicompiled/Launcher/artifacts/portable-tools/CMake/bin/cmake.exe -S D:/mkw-web/Wiicompiled/runtime -B D:/mkw-web/web/build-game -G Ninja -DCMAKE_MAKE_PROGRAM=D:/mkw-web/Wiicompiled/Launcher/artifacts/portable-tools/Ninja/ninja.exe -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF '-DCMAKE_C_FLAGS=-pthread -fwasm-exceptions -sSUPPORT_LONGJMP=wasm' '-DCMAKE_CXX_FLAGS=-pthread -fwasm-exceptions -sSUPPORT_LONGJMP=wasm' '-DCMAKE_EXE_LINKER_FLAGS=-pthread -fwasm-exceptions -sSUPPORT_LONGJMP=wasm' -DMKW_BUILD_PRODUCTS=ON -DMKW_NATIVE_PREBUILT_DIR= -DAURORA_DAWN_PROVIDER=system -DAURORA_SDL3_PROVIDER=system -DCMAKE_POLICY_DEFAULT_CMP0168=NEW -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_ABSEIL-CPP=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/abseil-cpp/ -DFETCHCONTENT_SOURCE_DIR_FMT=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/fmt/ -DFETCHCONTENT_SOURCE_DIR_FREETYPE=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/freetype/ -DFETCHCONTENT_SOURCE_DIR_IMGUI=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/imgui/ -DFETCHCONTENT_SOURCE_DIR_PNG=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/png/ -DFETCHCONTENT_SOURCE_DIR_SQLITE3=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/sqlite3/ -DFETCHCONTENT_SOURCE_DIR_TRACY=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/tracy/ -DFETCHCONTENT_SOURCE_DIR_XXHASH=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/xxhash/ -DFETCHCONTENT_SOURCE_DIR_ZLIB=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/zlib/ -DFETCHCONTENT_SOURCE_DIR_ZSTD=D:/mkw-web/Wiicompiled/Launcher/artifacts/dependencies/zstd/ '-DCMAKE_TOOLCHAIN_FILE=D:\mkw-web\emsdk\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake' '-DCMAKE_CROSSCOMPILING_EMULATOR=D:\mkw-web\emsdk/node/24.19.0_64bit/node.exe' in directory C:\Users\Light\OneDrive\Documents\mkw-web
+-- aurora: Fetching abseil-cpp (standalone)
+-- Performing Test ABSL_INTERNAL_AT_LEAST_CXX17
+-- Performing Test ABSL_INTERNAL_AT_LEAST_CXX17 - Success
+-- Performing Test ABSL_INTERNAL_AT_LEAST_CXX20
+-- Performing Test ABSL_INTERNAL_AT_LEAST_CXX20 - Success
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- aurora: Fetching xxhash
+-- xxHash build type: Release
+-- Architecture: x86
+-- aurora: Fetching fmt
+-- {fmt} version: 12.1.0
+-- Build type: Release
+-- Performing Test HAS_NULLPTR_WARNING
+-- Performing Test HAS_NULLPTR_WARNING - Success
+-- aurora: Fetching zlib
+-- Using CMake version 4.3.3
+-- ZLIB_HEADER_VERSION: 1.3.1
+-- ZLIBNG_HEADER_VERSION: 2.3.3
+-- Arch detected: 'wasm32'
+-- Basearch of 'wasm32' has been detected as: 'wasm32'
+-- Using CMake toolchain: D:/mkw-web/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+-- Performing Test FNO_LTO_AVAILABLE
+-- Performing Test FNO_LTO_AVAILABLE - Success
+-- Looking for arm_acle.h
+-- Looking for arm_acle.h - not found
+-- Looking for sys/auxv.h
+-- Looking for sys/auxv.h - not found
+-- Looking for sys/sdt.h
+-- Looking for sys/sdt.h - not found
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Looking for linux/auxvec.h
+-- Looking for linux/auxvec.h - not found
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Check size of off64_t
+-- Check size of off64_t - done
+-- Looking for fseeko
+-- Looking for fseeko - found
+-- Looking for strerror
+-- Looking for strerror - found
+-- Looking for __cpuid_count
+-- Looking for __cpuid_count - not found
+-- Performing Test HAVE_CPUID_MS
+-- Performing Test HAVE_CPUID_MS - Failed
+-- Performing Test HAVE_NO_INTERPOSITION
+-- Performing Test HAVE_NO_INTERPOSITION - Success
+-- Performing Test HAVE_ATTRIBUTE_VISIBILITY_HIDDEN
+-- Performing Test HAVE_ATTRIBUTE_VISIBILITY_HIDDEN - Success
+-- Performing Test HAVE_ATTRIBUTE_VISIBILITY_INTERNAL
+-- Performing Test HAVE_ATTRIBUTE_VISIBILITY_INTERNAL - Success
+-- Performing Test HAVE_ATTRIBUTE_ALIGNED
+-- Performing Test HAVE_ATTRIBUTE_ALIGNED - Success
+-- Performing Test HAVE_BUILTIN_ASSUME_ALIGNED
+-- Performing Test HAVE_BUILTIN_ASSUME_ALIGNED - Success
+-- Performing Test HAVE_BUILTIN_CTZ
+-- Performing Test HAVE_BUILTIN_CTZ - Success
+-- Performing Test HAVE_BUILTIN_CTZLL
+-- Performing Test HAVE_BUILTIN_CTZLL - Success
+-- Performing Test HAVE_PTRDIFF_T
+-- Performing Test HAVE_PTRDIFF_T - Success
+-- No optimized architecture: using arch/generic
+-- Architecture-specific source files: 
+-- The following features have been enabled:
+
+ * CMAKE_BUILD_TYPE, Build type: Release (selected)
+ * WITH_GZFILEOP, Compile with support for gzFile related functions
+ * ZLIB_COMPAT, Compile with zlib compatible API
+ * ZLIB_ALIASES, Compile with zlib compatible CMake targets
+ * WITH_SANITIZER, Enable sanitizer testing support
+ * WITH_OPTIM, Build with optimisation
+ * WITH_NEW_STRATEGIES, Use new strategies
+ * WITH_CRC32_CHORBA, Use optimized CRC32 algorithm Chorba
+ * WITH_RUNTIME_CPU_DETECTION, Build with runtime CPU detection
+
+-- The following REQUIRED packages have been found:
+
+ * Threads
+
+-- The following features have been disabled:
+
+ * ZLIB_SYMBOL_PREFIX, Publicly exported symbols DO NOT have a custom prefix
+ * BUILD_TESTING, Build test binaries
+ * WITH_GTEST, Build tests using Gtest framework
+ * WITH_FUZZERS, Build test/fuzz
+ * WITH_BENCHMARKS, Build benchmarks using Google Benchmark framework
+ * WITH_BENCHMARK_APPS, Build application benchmarks (currently libpng)
+ * WITH_ALL_FALLBACKS, Build all generic fallback functions
+ * WITH_NATIVE_INSTRUCTIONS, Instruct the compiler to use the full instruction set on this host (gcc/clang -march=native)
+ * WITH_MAINTAINER_WARNINGS, Build with project maintainer warnings
+ * WITH_CODE_COVERAGE, Enable code coverage reporting
+ * WITH_INFLATE_STRICT, Build with strict inflate distance checking
+ * WITH_INFLATE_ALLOW_INVALID_DIST, Build with zero fill for inflate invalid distances
+ * INSTALL_UTILS, Copy minigzip and minideflate during install
+
+-- aurora: Fetching libpng
+-- Building for target architecture: x86
+-- Performing Test HAVE_LD_VERSION_SCRIPT
+-- Performing Test HAVE_LD_VERSION_SCRIPT - Success
+-- Found AWK program: C:/Program Files/Git/usr/bin/gawk.exe
+-- Creating standard configuration
+-- aurora: Fetching Freetype
+-- Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE) 
+-- Could NOT find BZip2 (missing: BZIP2_LIBRARIES BZIP2_INCLUDE_DIR) 
+-- Looking for fcntl.h
+-- Looking for fcntl.h - found
+-- aurora: Fetching imgui
+-- aurora: Fetching sqlite3
+-- aurora: Fetching zstd
+-- The ASM compiler identification is unknown
+-- Found assembler: D:/mkw-web/emsdk/upstream/emscripten/emcc.exe
+-- ZSTD VERSION: 1.5.7
+-- Performing Test C_FLAG_WALL
+-- Performing Test C_FLAG_WALL - Success
+-- Performing Test CXX_FLAG_WALL
+-- Performing Test CXX_FLAG_WALL - Success
+-- Performing Test C_FLAG_WEXTRA
+-- Performing Test C_FLAG_WEXTRA - Success
+-- Performing Test CXX_FLAG_WEXTRA
+-- Performing Test CXX_FLAG_WEXTRA - Success
+-- Performing Test C_FLAG_WUNDEF
+-- Performing Test C_FLAG_WUNDEF - Success
+-- Performing Test CXX_FLAG_WUNDEF
+-- Performing Test CXX_FLAG_WUNDEF - Success
+-- Performing Test C_FLAG_WSHADOW
+-- Performing Test C_FLAG_WSHADOW - Success
+-- Performing Test CXX_FLAG_WSHADOW
+-- Performing Test CXX_FLAG_WSHADOW - Success
+-- Performing Test C_FLAG_WCAST_ALIGN
+-- Performing Test C_FLAG_WCAST_ALIGN - Success
+-- Performing Test CXX_FLAG_WCAST_ALIGN
+-- Performing Test CXX_FLAG_WCAST_ALIGN - Success
+-- Performing Test C_FLAG_WCAST_QUAL
+-- Performing Test C_FLAG_WCAST_QUAL - Success
+-- Performing Test CXX_FLAG_WCAST_QUAL
+-- Performing Test CXX_FLAG_WCAST_QUAL - Success
+-- Performing Test C_FLAG_WSTRICT_PROTOTYPES
+-- Performing Test C_FLAG_WSTRICT_PROTOTYPES - Success
+-- Performing Test LD_FLAG_WL_Z_NOEXECSTACK
+-- Performing Test LD_FLAG_WL_Z_NOEXECSTACK - Success
+-- Performing Test C_FLAG_QUNUSED_ARGUMENTS
+-- Performing Test C_FLAG_QUNUSED_ARGUMENTS - Success
+-- Performing Test CXX_FLAG_QUNUSED_ARGUMENTS
+-- Performing Test CXX_FLAG_QUNUSED_ARGUMENTS - Success
+-- Performing Test C_FLAG_WA_NOEXECSTACK
+-- Performing Test C_FLAG_WA_NOEXECSTACK - Success
+-- Performing Test CXX_FLAG_WA_NOEXECSTACK
+-- Performing Test CXX_FLAG_WA_NOEXECSTACK - Success
+-- CMAKE_INSTALL_PREFIX: D:/mkw-web/emsdk/upstream/emscripten/cache/sysroot
+-- CMAKE_INSTALL_LIBDIR: lib
+-- ZSTD_LEGACY_SUPPORT defined!
+-- ZSTD_MULTITHREAD_SUPPORT is enabled
+-- aurora: Fetching Tracy
+Parsing public/common/TracyVersion.hpp file
+VERSION 0.14.1
+-- Could NOT find rocprofiler-sdk (missing: rocprofiler-sdk_DIR)
+-- TRACY_ENABLE: OFF
+-- TRACY_ON_DEMAND: ON
+-- TRACY_CALLSTACK: (not set)
+-- TRACY_PLATFORM_HEADER: (not set)
+-- TRACY_NO_CALLSTACK: OFF
+-- TRACY_NO_CALLSTACK_INLINES: OFF
+-- TRACY_ONLY_LOCALHOST: OFF
+-- TRACY_NO_BROADCAST: OFF
+-- TRACY_ONLY_IPV4: OFF
+-- TRACY_NO_CODE_TRANSFER: OFF
+-- TRACY_NO_CONTEXT_SWITCH: OFF
+-- TRACY_NO_EXIT: OFF
+-- TRACY_NO_SAMPLING: OFF
+-- TRACY_NO_WAIT_STACKS: OFF
+-- TRACY_NO_VERIFY: OFF
+-- TRACY_NO_VSYNC_CAPTURE: OFF
+-- TRACY_NO_FRAME_IMAGE: OFF
+-- TRACY_NO_SYSTEM_TRACING: OFF
+-- TRACY_PATCHABLE_NOPSLEDS: OFF
+-- TRACY_MANUAL_LIFETIME: OFF
+-- TRACY_FIBERS: OFF
+-- TRACY_NO_CRASH_HANDLER: OFF
+-- TRACY_TIMER_FALLBACK: OFF
+-- TRACY_DISALLOW_HW_TIMER: OFF
+-- TRACY_LIBUNWIND_BACKTRACE: OFF
+-- TRACY_SYMBOL_OFFLINE_RESOLVE: OFF
+-- TRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT: OFF
+-- TRACY_DEBUGINFOD: OFF
+-- TRACY_IGNORE_MEMORY_FAULTS: OFF
+-- TRACY_OPENGL_AUTO_CALIBRATION: OFF
+-- TRACY_VERBOSE: OFF
+-- TRACY_NO_INTERNAL_MESSAGE: OFF
+-- TRACY_DEMANGLE: OFF
+-- Translator graph: 28891/28891 base functions shared; 0 profile-sensitive callers; 0 Retro Rewind functions
+-- Native runtime: compiled from source (no native prebuilt package is configured)
+-- RetroRewind target disabled (run translate-mod and emit-build-shards)
+-- Configuring done (97.2s)
+-- Generating done (0.5s)
+-- Build files have been written to: D:/mkw-web/web/build-game

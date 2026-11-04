@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKW Import Check</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --line: #d9d9d4; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --line: #33332f; } }
+  body { margin: 0; padding: 32px 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  button { font: inherit; padding: 8px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--fg); color: var(--bg); cursor: pointer; }
+  progress { width: 100%; height: 10px; margin: 16px 0 4px; }
+  #status { font-variant-numeric: tabular-nums; }
+  pre { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; max-height: 260px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Check the imported game files</h1>
+  <p>Compares every file the game reads from this browser's private storage (OPFS) byte for byte
+     against the copy on the local server, and reports any file that differs or is missing.</p>
+  <button id="go">Start check</button>
+  <progress id="bar" value="0" max="1"></progress>
+  <div id="status">Idle.</div>
+  <pre id="log"></pre>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const log = (line) => { $('log').textContent += line + '\n'; };
+const report = (text) => fetch('/log?variant=verify', { method: 'POST', body: text });
+const mib = (n) => (n / 1048576).toFixed(1) + ' MiB';
+
+async function opfsFile(root, path) {
+  let dir = root;
+  const parts = path.split('/');
+  const name = parts.pop();
+  for (const part of parts) dir = await dir.getDirectoryHandle(part);
+  return (await dir.getFileHandle(name)).getFile();
+}
+
+function firstDifference(a, b) {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) if (a[i] !== b[i]) return i;
+  return a.length === b.length ? -1 : n;
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  const problems = [];
+  try {
+    const { files } = await (await fetch('/game-manifest.json')).json();
+    const total = files.reduce((sum, f) => sum + f.size, 0);
+    const dvd = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('WiiCompiled')).getDirectoryHandle('dvd');
+    let done = 0;
+    for (const file of files) {
+      try {
+        const stored = new Uint8Array(await (await opfsFile(dvd, file.path)).arrayBuffer());
+        const served = new Uint8Array(await (await fetch('/game/' + file.path.split('/').map(encodeURIComponent).join('/'))).arrayBuffer());
+        const at = firstDifference(stored, served);
+        if (at >= 0) problems.push(`DIFFERS ${file.path}: sizes ${stored.length}/${served.length}, first difference at byte ${at}`);
+      } catch (error) {
+        problems.push(`MISSING ${file.path}: ${error.message}`);
+      }
+      done += file.size;
+      $('bar').value = done / total;
+      $('status').textContent = `${mib(done)} / ${mib(total)} checked, ${problems.length} problem(s)`;
+    }
+    const summary = `verify finished: ${files.length} files, ${problems.length} problem(s)\n` + problems.slice(0, 50).join('\n');
+    log(summary);
+    report(summary);
+  } catch (error) {
+    log('ERROR: ' + (error.stack || error));
+    report('ERROR: ' + (error.stack || error));
+  } finally {
+    $('go').disabled = false;
+  }
+};
+if (new URLSearchParams(location.search).has('auto')) $('go').click();
+</script>
+</body>
+</html>
