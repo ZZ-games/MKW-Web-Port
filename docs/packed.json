@@ -1,0 +1,83 @@
+{
+ "version": "eba64e30256844c8",
+ "assets": {
+  "play/WiiCompiled.wasm": {
+   "type": "application/wasm",
+   "size": 115985924,
+   "packedSize": 24103397,
+   "sha256": "9c2c437e1be0ece921671ce1e9820e180db4f60770ed236f4c4aed0f33584ad1",
+   "parts": [
+    "packed/play__WiiCompiled.wasm.gz.0",
+    "packed/play__WiiCompiled.wasm.gz.1",
+    "packed/play__WiiCompiled.wasm.gz.2",
+    "packed/play__WiiCompiled.wasm.gz.3"
+   ]
+  },
+  "play/WiiCompiled-safe.wasm": {
+   "type": "application/wasm",
+   "size": 132243746,
+   "packedSize": 25019558,
+   "sha256": "482dd08025611c2b8484b11637d14cee58dd507946a4e986517b6f1d7c2c4245",
+   "parts": [
+    "packed/play__WiiCompiled-safe.wasm.gz.0",
+    "packed/play__WiiCompiled-safe.wasm.gz.1",
+    "packed/play__WiiCompiled-safe.wasm.gz.2",
+    "packed/play__WiiCompiled-safe.wasm.gz.3"
+   ]
+  },
+  "play/initial_pipeline_cache.db": {
+   "type": "application/octet-stream",
+   "size": 4567040,
+   "packedSize": 98517,
+   "sha256": "b558b6c365b45c3e11d1f44b053867bad78ca9af1b612e3c3307c47f5cfb4dca",
+   "parts": [
+    "packed/play__initial_pipeline_cache.db.gz.0"
+   ]
+  },
+  "play/cacert.pem": {
+   "type": "application/x-pem-file",
+   "size": 188900,
+   "packedSize": 110115,
+   "sha256": "f66dff1bdf8f96060b8177976f8b7d9254bc89bc4db933d769f7384d28480bc9",
+   "parts": [
+    "packed/play__cacert.pem.gz.0"
+   ]
+  },
+  "blobs/StaticR.bin": {
+   "type": "application/octet-stream",
+   "size": 4933744,
+   "packedSize": 1741180,
+   "sha256": "be00e6b2f656d5ebd62050daa162523c9f7abcd02fd51a12b6c1a044f10e0f69",
+   "parts": [
+    "packed/blobs__StaticR.bin.gz.0"
+   ]
+  },
+  "blobs/_text.bin": {
+   "type": "application/octet-stream",
+   "size": 2349696,
+   "packedSize": 1008283,
+   "sha256": "e90c2c30e1402e6c7f8ec47d33ddf9629ea26cfcb7672c95f1288f21739620f6",
+   "parts": [
+    "packed/blobs___text.bin.gz.0"
+   ]
+  },
+  "blobs/_data.bin": {
+   "type": "application/octet-stream",
+   "size": 293536,
+   "packedSize": 99060,
+   "sha256": "40cb03ab5badc9002af6d72a1020f55d73e9ecf239e5a32413616616daf8a749",
+   "parts": [
+    "packed/blobs___data.bin.gz.0"
+   ]
+  },
+  "blobs/_rodata.bin": {
+   "type": "application/octet-stream",
+   "size": 78880,
+   "packedSize": 57108,
+   "sha256": "7947df1c2ca9ac982d910f8d22da9b09577ca3648ecc74fd8ffc0721d225ab37",
+   "parts": [
+    "packed/blobs___rodata.bin.gz.0"
+   ]
+  }
+ }
+}

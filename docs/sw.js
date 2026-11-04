@@ -1,11 +1,12 @@
 /*! coi-serviceworker - Guido Zuidhof, licensed under MIT (modified) */
-/* Service Worker: adds COOP/COEP headers + rewrites absolute paths for GitHub Pages subdir hosting. */
-/* v4 */
+/* Service Worker: adds COOP/COEP headers, rewrites absolute paths for GitHub Pages subdir hosting,
+   and serves the game's big startup files from compressed, cached packs. */
+/* v5 */
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 // The WASM binary hardcodes absolute fetch paths like /blobs/*, /play/*, etc.
-// On GitHub Pages the site lives at /mkw-web/, so rewrite those to the correct subdir.
+// On GitHub Pages the site lives in a subfolder, so rewrite those to the correct subdir.
 const BASE = new URL("./", self.registration.scope).pathname;
 const REWRITE_PREFIXES = ["/blobs/", "/play/", "/game/"];
 
@@ -29,12 +30,6 @@ function rewriteUrl(url) {
   return url;
 }
 
-// The game binaries are larger than GitHub's 100 MB file limit, so they are stored as
-// WiiCompiled.wasm.part0, .part1, ... with a WiiCompiled.wasm.parts.json manifest. A request for
-// the whole .wasm is answered by streaming the parts back together. If there is no manifest
-// (e.g. a local build with the whole file), the request goes through unchanged.
-const SPLIT_WASM = /\/play\/WiiCompiled(-safe)?\.wasm$/;
-
 function isolationHeaders(headers) {
   headers.set("Cross-Origin-Embedder-Policy", COEP_VALUE);
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
@@ -42,19 +37,52 @@ function isolationHeaders(headers) {
   return headers;
 }
 
-async function joinedWasm(url) {
-  const manifestResp = await fetch(url + ".parts.json", { cache: "no-cache" });
-  if (!manifestResp.ok) return null;
-  const { size, parts } = await manifestResp.json();
+// ── Packed assets ──
+// packed.json (made by web/tools/pack_assets.py) lists files stored gzip-compressed and split
+// into parts. A request for one of them is answered by downloading all its parts in parallel,
+// decompressing, and saving the result in Cache Storage, so the next launch needs no download.
+const CACHE = "mkw-assets";
+let manifestPromise = null;
+const inflight = new Map(); // cache key -> promise that settles when the cache write finishes
+
+function loadManifest() {
+  if (!manifestPromise) {
+    manifestPromise = fetch(BASE + "packed.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m) => { if (m) pruneCache(m); return m; })
+      .catch(() => null);
+    // Re-read the manifest now and then, so a new deploy is picked up without a SW update.
+    setTimeout(() => { manifestPromise = null; }, 60000);
+  }
+  return manifestPromise;
+}
+
+const cacheKey = (path, entry) => self.location.origin + BASE + path + "?sha=" + entry.sha256;
+
+async function pruneCache(manifest) {
+  try {
+    const cache = await caches.open(CACHE);
+    const keep = new Set(Object.entries(manifest.assets).map(([p, e]) => cacheKey(p, e)));
+    for (const req of await cache.keys()) if (!keep.has(req.url)) await cache.delete(req);
+  } catch {}
+}
+
+function assetHeaders(entry) {
+  return isolationHeaders(new Headers({ "Content-Type": entry.type, "Content-Length": String(entry.size) }));
+}
+
+// Joins the parts (all requested at once) into one stream, in order.
+function joinedParts(entry) {
+  const responses = entry.parts.map((p) => fetch(BASE + p, { cache: "no-cache" }));
   let index = 0, reader = null;
-  const body = new ReadableStream({
+  return new ReadableStream({
     async pull(controller) {
       for (;;) {
         if (!reader) {
-          if (index >= parts.length) { controller.close(); return; }
-          const part = await fetch(new URL(parts[index++], url));
-          if (!part.ok) { controller.error(new Error("missing " + parts[index - 1] + ": " + part.status)); return; }
-          reader = part.body.getReader();
+          if (index >= responses.length) { controller.close(); return; }
+          const resp = await responses[index++];
+          if (!resp.ok) { controller.error(new Error("missing " + entry.parts[index - 1] + ": " + resp.status)); return; }
+          reader = resp.body.getReader();
         }
         const { done, value } = await reader.read();
         if (done) { reader = null; continue; }
@@ -64,8 +92,25 @@ async function joinedWasm(url) {
     },
     cancel() { if (reader) reader.cancel(); },
   });
-  const headers = isolationHeaders(new Headers({ "Content-Type": "application/wasm", "Content-Length": String(size) }));
-  return new Response(body, { status: 200, headers });
+}
+
+async function packedResponse(path) {
+  const manifest = await loadManifest();
+  const entry = manifest && manifest.assets[path];
+  if (!entry) return null;
+  const key = cacheKey(path, entry);
+  const cache = await caches.open(CACHE).catch(() => null);
+  if (inflight.has(key)) await inflight.get(key).catch(() => {});
+  const hit = cache && await cache.match(key);
+  if (hit) return new Response(hit.body, { status: 200, headers: assetHeaders(entry) });
+
+  const body = joinedParts(entry).pipeThrough(new DecompressionStream("gzip"));
+  if (!cache) return new Response(body, { status: 200, headers: assetHeaders(entry) });
+  const [forPage, forCache] = body.tee();
+  const write = cache.put(key, new Response(forCache, { headers: { "Content-Type": entry.type } }));
+  inflight.set(key, write);
+  write.catch(() => {}).finally(() => inflight.delete(key));
+  return new Response(forPage, { status: 200, headers: assetHeaders(entry) });
 }
 
 self.addEventListener("fetch", (e) => {
@@ -76,16 +121,18 @@ self.addEventListener("fetch", (e) => {
 
   const rewritten = rewriteUrl(e.request.url);
   const req = rewritten !== e.request.url ? new Request(rewritten, e.request) : e.request;
+  const passThrough = () => fetch(req).then((r) => {
+    if (r.status === 0) return r;
+    return new Response(r.body, { status: r.status, statusText: r.statusText, headers: isolationHeaders(new Headers(r.headers)) });
+  });
+
   const path = new URL(rewritten).pathname;
-  if (SPLIT_WASM.test(path) && e.request.method === "GET") {
-    e.respondWith(joinedWasm(new URL(rewritten).origin + path).then((r) => r || fetch(req).then((x) => new Response(x.body, { status: x.status, statusText: x.statusText, headers: isolationHeaders(new Headers(x.headers)) }))));
-    return;
+  if (e.request.method === "GET" && path.startsWith(BASE)) {
+    const rel = path.slice(BASE.length);
+    if (/^(play|blobs)\//.test(rel)) {
+      e.respondWith(packedResponse(rel).then((r) => r || passThrough()).catch((err) => { console.error(err); return passThrough(); }));
+      return;
+    }
   }
-  e.respondWith(
-    fetch(req).then((r) => {
-      if (r.status === 0) return r;
-      const headers = isolationHeaders(new Headers(r.headers));
-      return new Response(r.body, { status: r.status, statusText: r.statusText, headers });
-    }).catch((err) => console.error(err))
-  );
+  e.respondWith(passThrough().catch((err) => console.error(err)));
 });

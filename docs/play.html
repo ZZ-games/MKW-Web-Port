@@ -29,6 +29,9 @@
   #fullscreen[hidden] { display: none; }
   #status { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 4px 12px; color: var(--muted); background: rgb(0 0 0 / 60%); border-radius: 4px; font-variant-numeric: tabular-nums; pointer-events: none; }
   #status[hidden] { display: none; }
+  #game-dl { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, 80vw); text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #game-dl[hidden] { display: none; }
+  #game-dl progress { width: 100%; height: 8px; accent-color: #6f9ef0; }
 
   /* Download overlay */
   #dl-overlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 12px; padding: 16px; }
@@ -84,6 +87,7 @@
   <canvas id="canvas" width="854" height="480" tabindex="0"></canvas>
   <button id="fullscreen" type="button" title="Full screen (Esc to leave)">Full screen</button>
   <div id="status">Loading&hellip;</div>
+  <div id="game-dl" hidden><div id="game-dl-text">Downloading game…</div><progress id="game-dl-bar" value="0" max="1"></progress></div>
 </div>
 
 <script>
@@ -165,7 +169,47 @@
       requestAnimationFrame(tick);
       setTimeout(() => resolve(60), 2000);
     });
-    measureDisplayHz().then((hz) => {
+    // First launch: download the game's startup files with a progress bar. The service worker
+    // fetches them compressed and keeps them on this device, so later launches skip this.
+    const prefetch = async () => {
+      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+      let manifest;
+      try { manifest = await (await fetch('packed.json', { cache: 'no-cache' })).json(); } catch { return; }
+      const other = variant === 'WiiCompiled' ? 'play/WiiCompiled-safe.wasm' : 'play/WiiCompiled.wasm';
+      const entries = Object.entries(manifest.assets).filter(([path]) => path !== other);
+      const cache = await caches.open('mkw-assets').catch(() => null);
+      const missing = [];
+      for (const [path, entry] of entries) {
+        const hit = cache && await cache.match(location.origin + new URL(path, location.href).pathname + '?sha=' + entry.sha256);
+        if (!hit) missing.push([path, entry]);
+      }
+      if (!missing.length) return;
+      const box = document.getElementById('game-dl'), bar = document.getElementById('game-dl-bar'), text = document.getElementById('game-dl-text');
+      const total = missing.reduce((s, [, e]) => s + e.size, 0);
+      const packed = missing.reduce((s, [, e]) => s + e.packedSize, 0);
+      const mb = (n) => (n / 1048576).toFixed(0);
+      let done = 0;
+      const started = performance.now();
+      setStatus('', false);
+      box.hidden = false;
+      const show = () => {
+        const frac = done / total;
+        const secs = (performance.now() - started) / 1000;
+        const speed = secs > 0.5 ? (frac * packed) / secs : 0;
+        bar.value = frac;
+        text.textContent = 'Downloading game — ' + mb(frac * packed) + ' / ' + mb(packed) + ' MB' +
+          (speed ? ' · ' + (speed / 1048576).toFixed(1) + ' MB/s' : '') + ' (only needed once)';
+      };
+      show();
+      await Promise.all(missing.map(async ([path]) => {
+        const resp = await fetch(path);
+        const reader = resp.body.getReader();
+        for (;;) { const { done: end, value } = await reader.read(); if (end) break; done += value.byteLength; show(); }
+      })).catch((err) => console.warn('[page] prefetch failed, the game will load files itself:', err));
+      box.hidden = true;
+    };
+
+    Promise.all([measureDisplayHz(), prefetch()]).then(([hz]) => {
       const params = new URLSearchParams(location.search);
       // The game runs at 60 fps and interpolates up to the display rate. On a 120 Hz iPad Pro that
       // doubles the presented frames, which is the expensive part, so cap iOS/iPadOS at 60 unless
